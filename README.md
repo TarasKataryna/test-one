@@ -478,7 +478,11 @@ public class JobCredentialsManager : IJobCredentialsManager
     }
 ```
 
-# User permissions check
+# User's permissions validation 
+**Description**
+All user's data with permissions are stored in the Single Sign-On web applicaiton. This example contains the functionallity that validate user's permission in internall web application calling the SSO application.
+
+
 ```
  public class PermissionRequiredFilter : IAsyncAuthorizationFilter
  {
@@ -528,21 +532,21 @@ public class JobCredentialsManager : IJobCredentialsManager
      }
  }
 
-    [AttributeUsage(AttributeTargets.Method)]
-    public class PermissionAuthorizeAttribute : AuthorizeAttribute, IFilterFactory
+[AttributeUsage(AttributeTargets.Method)]
+public class PermissionAuthorizeAttribute : AuthorizeAttribute, IFilterFactory
+{
+    public string Permission { get; set; }
+
+    public bool IsReusable => true;
+
+    public PermissionAuthorizeAttribute(string permission)
     {
-        public string Permission { get; set; }
-
-        public bool IsReusable => true;
-
-        public PermissionAuthorizeAttribute(string permission)
-        {
-            Permission = permission;
-        }
-
-        public IFilterMetadata CreateInstance(IServiceProvider serviceProvider)
-        {
-            return (IFilterMetadata) serviceProvider.GetService(typeof(PermissionRequiredFilter));
-        }
+        Permission = permission;
     }
+
+    public IFilterMetadata CreateInstance(IServiceProvider serviceProvider)
+    {
+        return (IFilterMetadata) serviceProvider.GetService(typeof(PermissionRequiredFilter));
+    }
+}
 ```
