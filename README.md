@@ -2,7 +2,7 @@
 **Description**
 <br>In this example, the logic demonstrated is generic and can handle different data depending on the parameter passed from the banking program. It retrieves the necessary data, converts it into a CSV file, saves a backup, encrypts this file, and transfers it to the bank's SFTP server, essentially for reporting purposes. Additionally, this logic is specifically for an AWS Lambda function.
 
-```
+```csharp
 public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution solution, bool isLambda)
 {
     var methodName = $"[{nameof(SendTransactionalDataToBank)}]";
