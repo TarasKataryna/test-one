@@ -1,4 +1,4 @@
-# MCC Project
+# lambda function
 
 
 ```
@@ -155,7 +155,7 @@ public async Task<byte[]> ConvertTransactionToTransactionalData(
 }
 ```
 
-# RSC Project
+# Custom job handler resolving with creds caching
 ```
 public class JobHandlerFactory: IJobHandlerFactory
 {
@@ -423,4 +423,57 @@ public class JobCredentialsManager : IJobCredentialsManager
     }
 }
 
+```
+
+# Custom Converter
+
+```
+    public class BusinessOwnerConverter : JsonConverter
+    {
+        private const int IndividualCollectionsMaxCount = 4;
+
+        public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
+        {
+            throw new NotImplementedException();
+        }
+
+        public override object ReadJson(JsonReader reader, Type objectType, object existingValue, JsonSerializer serializer)
+        {
+            var json = JObject.Load(reader);
+
+            foreach (var property in json.Properties().ToList())
+            {
+                property.Replace(new JProperty(property.Name.ToLower(), property.Value));
+            }
+
+            var boDtoType = typeof(BusinessOwnerIntegrationDto);
+            var boObjectProperties = boDtoType.GetProperties();
+
+            var individualInfoDto = new IndividualInfoIntegrationDto();
+            for (var i = 1; i <= IndividualCollectionsMaxCount; ++i)
+            {
+                var businessOwner = new BusinessOwnerIntegrationDto();
+                foreach (var property in boObjectProperties)
+                {
+                    var jsonPropertyName = string.Format(property.GetCustomAttribute<JsonPropertyAttribute>().PropertyName, i).ToLower();
+                    var objectPropertyType = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+
+                    var strValue = json[jsonPropertyName]?.ToString()?.Trim();
+
+                    var safeValue = string.IsNullOrEmpty(strValue) ? null : Convert.ChangeType(strValue, objectPropertyType);
+
+                    boDtoType.GetProperty(property.Name)?.SetValue(businessOwner, safeValue);
+                }
+
+                individualInfoDto.BusinessOwnerCollection.Add(businessOwner);
+            }
+
+            return individualInfoDto;
+        }
+
+        public override bool CanConvert(Type objectType)
+        {
+            return objectType == typeof(IndividualInfoIntegrationDto);
+        }
+    }
 ```
