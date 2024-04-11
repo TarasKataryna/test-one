@@ -21,8 +21,6 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
     {
         var transactions = await _remittanceTransactionFundingProvider.GetRemittanceTransactionFundingAsync(dateToProcess, dateToProcess);
 
-        await AddLog($"{methodName}[{solutionName}]Transactions to send count - {transactions.Count()}.");
-
         if (!transactions.Any())
         {
             return;
@@ -40,8 +38,6 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
         var bankCsvReportBytes = await bankCsvProcessor.ConvertTransactionToTransactionalData(transactions,
             merchants, accounts, currentDateTime, achDetailId, programId);
 
-        await AddLog($"{methodName}[{solutionName}]TRN file was created.");
-
         var transactionDataLayoutFileName = $"TRN_{_internalSettings.BankSettings.CompanyIdentification}_ACH{programId}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
         var encryptedDataLayoutFileName = $"{transactionDataLayoutFileName}.pgp";
         try
@@ -52,8 +48,6 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
 
             _s3Client = new AWS_S3(_internalSettings, _dbContext);
             await _s3Client.UploadObject($"{s3ObjectPath}{transactionDataLayoutFileName.Replace("/", "-")}", backupStream);
-
-            await AddLog($"{methodName}[{solutionName}]File saved to s3 bucket.");
         }
         catch (Exception ex)
         {
@@ -64,15 +58,10 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
 
         _bankCommunicationService.CreateSftpClient(isLambda);
 
-        await AddLog($"{methodName}[{solutionName}]SFTP client created.");
-
         var encryptedFileBytes = _bankCommunicationService.EncryptData(isLambda, bankCsvReportBytes, encryptedDataLayoutFileName, _internalSettings.BankSettings.PGPEncPublic);
-
-        await AddLog($"{methodName}[{solutionName}]Encrypting file.");
 
         var uploadResult = await _bankCommunicationService.UploadFile(sftpFileLocation, encryptedFileBytes, "Customer Data Layout Upload");
 
-        await AddLog($"{methodName}[{solutionName}]File upload result - {uploadResult.Success}");
 
         if (!uploadResult.Success)
         {
