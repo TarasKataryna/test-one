@@ -203,14 +203,14 @@ public class JobHandlerFactory: IJobHandlerFactory
                     var oldFirstJobHandler  = jobHandler as FirstJobJobHandler;
                     FirstService firstServiceOptions = null;
 
-                    var firstServiceOptions = serviceProvider.GetService<IOptions<LexisNexisSettings>>();
-                    if (jobConfig is LexisNexisSettings partnerLexisNexisConfigs)
+                    var firstServiceOptions = serviceProvider.GetService<IOptions<FirstServiceSettings>>();
+                    if (jobConfig is FirstServiceSettings partnerFirstServiceConfigs)
                     {
-                        firstServiceObj = new FirstService(Options.Create(partnerLexisNexisConfigs));
+                        firstServiceObj = new FirstService(Options.Create(partnerFirstServiceConfigs));
                     }
                     else
                     {
-                        firstServiceObj = new BridgerXgService(lexisNexisOptions);
+                        firstServiceObj = new BridgerXgService(firstServiceOptions);
                     }
 
                     var reportGenerator = serviceProvider.GetService<IFirstJobReportGenerator>();
@@ -220,47 +220,47 @@ public class JobHandlerFactory: IJobHandlerFactory
 
                     return newFirstJobHandler;
                     break;
-                case EJob.CreditReport:
+                case EJob.SecondJob:
 
-                    var crs = jobHandler as CreditReportJobHandler;
-                    BusinessOwnerService businessOwnerService = null;
-                    ExperianHttpClient experianHttpClient = null;
+                    var secondJobHandler = jobHandler as SecondJobHandler;
+                    SecondService secondService = null;
+                    SecondServiceHttpClient secondServiceHttpClient = null;
 
-                    var experianOptions = serviceProvider.GetService<IOptions<ExperianSettings>>();
+                    var secondServiceOptions = serviceProvider.GetService<IOptions<SecondServiceSettings>>();
 
-                    if (jobConfig is ExperianSettings partnerExperianConfigs)
+                    if (jobConfig is SecondServiceSettings partnerSecondServiceConfigs)
                     {
-                        var expNewOptions = Options.Create(partnerExperianConfigs);
-                        experianHttpClient = new ExperianHttpClient(httpClientFactory, expNewOptions);
-                        businessOwnerService = new BusinessOwnerService(experianHttpClient, expNewOptions);
+                        var expNewOptions = Options.Create(partnerSecondServiceConfigs);
+                        secondServiceHttpClient = new SecondServiceHttpClient(httpClientFactory, partnerSecondServiceConfigs);
+                        secondService = new SecondService(secondServiceHttpClient, partnerSecondServiceConfigs);
                     }
                     else
                     {
-                        experianHttpClient = new ExperianHttpClient(httpClientFactory, experianOptions);
-                        businessOwnerService = new BusinessOwnerService(experianHttpClient, experianOptions);
+                        secondServiceHttpClient = new SecondServiceHttpClient(httpClientFactory, secondServiceOptions);
+                        SecondService = new SecondService(secondServiceHttpClient, secondServiceOptions);
                     }
 
                     var documentRepresentationFactCr = serviceProvider.GetService<IDocumentRepresentationFactory>();
-                    var newCrs = new CreditReportJobHandler(crs, businessOwnerService, documentRepresentationFactCr);
+                    var secondNewJobHandler = new CreditReportJobHandler(secondOldJobHandler, businessOwnerService, documentRepresentationFactCr);
 
-                    return newCrs;
+                    return secondNewJobHandler;
                     break;
-                case EJob.ValidiFi:
+                case EJob.TirdJob:
 
-                    var vs = jobHandler as ValidiFiJobHandler;
-                    ValidiFiService validifyService = null;
+                    var vs = jobHandler as ThirdJobHandler;
+                    ThirdService thirdService = null;
 
-                    var validifyOptions = serviceProvider.GetService<IOptions<ValidiFiSettings>>();
-                    if (jobConfig is ValidiFiSettings partnerValidifyConfigs)
+                    var thirdServiceOptions = serviceProvider.GetService<IOptions<ThirdServiceSettings>>();
+                    if (jobConfig is ThirdServiceSettings partnerThirdServiceConfigs)
                     {
-                        validifyService = new ValidiFiService(Options.Create(partnerValidifyConfigs), httpClientFactory);
+                        thirdService = new ThirdService(Options.Create(partnerThirdServiceConfigs), httpClientFactory);
                     }
                     else
                     {
-                        validifyService = new ValidiFiService(validifyOptions, httpClientFactory);
+                        thirdService = new ThirdService(thirdServiceOptions, httpClientFactory);
                     }
 
-                    var newVs = new ValidiFiJobHandler(vs, validifyService);
+                    var newVs = new ThirdJobHandler(vs, thirdService);
 
                     return newVs;
                     break;
