@@ -12,9 +12,9 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
     }
     
     var solutionName = Enum.GetName(typeof(Solution), solution);
-    var programId = solution == Solution.MoneyExpress
-        ? _mccSettings.BankSettings.FirstSolutionProgramId
-        : _mccSettings.BankSettings.SecondSolutionProgramId;
+    var programId = solution == Solution.MoneyFirstServiceress
+        ? _internalSettings.BankSettings.FirstSolutionProgramId
+        : _internalSettings.BankSettings.SecondSolutionProgramId;
 
     try
     {
@@ -33,7 +33,7 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
         var accounts = await _merchantAccountProvider.
             GetAllByConditionAsync($" {nameof(MerchantAccount.MerchantUid)} IN ({string.Join(",", merchants.Select(m => m.Uid))})");
 
-        var bankCsvProcessor = new BankCsvProcessor(_mccSettings);
+        var bankCsvProcessor = new BankCsvProcessor(_internalSettings);
 
         var achDetailId = long.Parse(transactions.First().RefNumber);
         var bankCsvReportBytes = await bankCsvProcessor.ConvertTransactionToTransactionalData(transactions,
@@ -41,7 +41,7 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
 
         await AddLog($"{methodName}[{solutionName}]TRN file was created.");
 
-        var transactionDataLayoutFileName = $"TRN_{_mccSettings.BankSettings.CompanyIdentification}_ACH{programId}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
+        var transactionDataLayoutFileName = $"TRN_{_internalSettings.BankSettings.CompanyIdentification}_ACH{programId}_{DateTime.UtcNow:yyyyMMddHHmmss}.csv";
         var encryptedDataLayoutFileName = $"{transactionDataLayoutFileName}.pgp";
         try
         {
@@ -49,7 +49,7 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
 
             using var backupStream = new MemoryStream(bankCsvReportBytes);
 
-            _s3Client = new AWS_S3(_mccSettings, _dbContext);
+            _s3Client = new AWS_S3(_internalSettings, _dbContext);
             await _s3Client.UploadObject($"{s3ObjectPath}{transactionDataLayoutFileName.Replace("/", "-")}", backupStream);
 
             await AddLog($"{methodName}[{solutionName}]File saved to s3 bucket.");
@@ -59,13 +59,13 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
             await AddLog($"{methodName}[{solutionName}][S3Backup] Exception: {ex.Message}", true);
         }
 
-        var sftpFileLocation = $"/users/{_mccSettings.BankSettings.SFTPUser}/incoming/{encryptedDataLayoutFileName}";
+        var sftpFileLocation = $"/users/{_internalSettings.BankSettings.SFTPUser}/incoming/{encryptedDataLayoutFileName}";
 
         _bankCommunicationService.CreateSftpClient(isLambda);
 
         await AddLog($"{methodName}[{solutionName}]SFTP client created.");
 
-        var encryptedFileBytes = _bankCommunicationService.EncryptData(isLambda, bankCsvReportBytes, encryptedDataLayoutFileName, _mccSettings.BankSettings.PGPEncPublic);
+        var encryptedFileBytes = _bankCommunicationService.EncryptData(isLambda, bankCsvReportBytes, encryptedDataLayoutFileName, _internalSettings.BankSettings.PGPEncPublic);
 
         await AddLog($"{methodName}[{solutionName}]Encrypting file.");
 
@@ -101,10 +101,10 @@ public async Task<byte[]> ConvertTransactionToTransactionalData(
     var header = new BankTransactionalDataHeader()
     {
         RecordType = HeaderRecordType,
-        FileType = _mccSettings.BankSettings.TransactionalDataLayout.FileType,
-        Version = _mccSettings.BankSettings.TransactionalDataLayout.Version,
+        FileType = _internalSettings.BankSettings.TransactionalDataLayout.FileType,
+        Version = _internalSettings.BankSettings.TransactionalDataLayout.Version,
         ProgramType = "ACH",
-        CompanyID = _mccSettings.BankSettings.MeCompanyIdentification, // todo: clarify source of this value
+        CompanyID = _internalSettings.BankSettings.MeCompanyIdentification, // todo: clarify source of this value
         ProgramID = programId,
         FileDateTime = dateTimeNow,
     };
@@ -121,7 +121,7 @@ public async Task<byte[]> ConvertTransactionToTransactionalData(
         return BankTransactionalDataDetails.FromMerchant(
             merchant,
             DataRecordType,
-            _mccSettings.BankSettings.CompanyIdentification,
+            _internalSettings.BankSettings.CompanyIdentification,
             programId,
             bankAccount?.AccountNumber,
             item,
@@ -282,28 +282,28 @@ public class JobCredentialsManager : IJobCredentialsManager
     
     private readonly IMemoryCache _memoryCache;
     private readonly IIdentityService _identityService;
-    private readonly IMccService _mccService;
+    private readonly IInternalService _internalService;
     private readonly ILogger<JobCredentialsManager> _logger;
 
-    private readonly ExperianSettings _experianSettings;
-    private readonly LexisNexisSettings _lexisNexisSettings;
-    private readonly ValidiFiSettings _validiFiSettings;
+    private readonly FirstServiceSettings _firstServiceSettings;
+    private readonly SecondServiceSettings _secondServiceSettings;
+    private readonly ThirdServiceSettings _thirdServiceSettings;
 
     public JobCredentialsManager(IMemoryCache memoryCache, 
         IIdentityService identityService, 
-        IMccService mccService,
+        IInternalService internalService,
         ILogger<JobCredentialsManager> logger,
-        IOptions<ExperianSettings> experianSettings,
-        IOptions<LexisNexisSettings> lexisNexisSettings,
-        IOptions<ValidiFiSettings> validiFiSettings)
+        IOptions<FirstServiceSettings> firstServiceSettings,
+        IOptions<SecondServiceSettings> secondServiceSettings,
+        IOptions<ThirdServiceSettings> thirdServiceSettings)
     {
         _memoryCache = memoryCache;
         _identityService = identityService;
-        _mccService = mccService;
+        _internalService = internalService;
         _logger = logger;
-        _experianSettings = experianSettings.Value;
-        _lexisNexisSettings = lexisNexisSettings.Value;
-        _validiFiSettings = validiFiSettings.Value;
+        _firstServiceSettings = firstServiceSettings.Value;
+        _secondServiceSettings = secondServiceSettings.Value;
+        _thirdServiceSettings = thirdServiceSettings.Value;
     }
 
     public async Task<object> Get(string partnerId, EJob jobType)
@@ -326,7 +326,7 @@ public class JobCredentialsManager : IJobCredentialsManager
             }
             else
             {
-                var partners = await _mccService.GetPartnerHierarchy(partnerId);
+                var partners = await _internalService.GetPartnerHierarchy(partnerId);
 
                 if (partners is not null && partners.Any())
                 {
@@ -345,7 +345,7 @@ public class JobCredentialsManager : IJobCredentialsManager
 
                         _memoryCache.Set($"{partnerId}{JobCredsPrefix}", credentialsDict, new MemoryCacheEntryOptions
                         {
-                            AbsoluteExpiration = DateTimeOffset.UtcNow.AddHours(2)
+                            AbsoluteFirstServiceiration = DateTimeOffset.UtcNow.AddHours(2)
                         });
 
                         partnerJobCredentials = configurations.FirstOrDefault(p => p.JobType == (byte)jobType)?.JobConfiguration;
@@ -355,56 +355,56 @@ public class JobCredentialsManager : IJobCredentialsManager
 
             switch (jobType)
             {
-                case EJob.CreditReport:
+                case EJob.FirstJob:
 
-                    var expSettings = _experianSettings;
+                    var expSettings = _firstServiceSettings;
 
                     if (!string.IsNullOrEmpty(partnerJobCredentials))
                     {
-                        var partnerExpSettings = partnerJobCredentials.TryDeserializeObject<ExperianSettings>();
+                        var partnerFirstServiceSettings = partnerJobCredentials.TryDeserializeObject<FirstServiceSettings>();
                         
-                        if (partnerExpSettings is not null)
+                        if (partnerFirstServiceSettings is not null)
                         {
-                            expSettings.ClientID = partnerExpSettings.ClientID;
-                            expSettings.ClientSecret = partnerExpSettings.ClientSecret;
-                            expSettings.Username = partnerExpSettings.Username;
-                            expSettings.Password = partnerExpSettings.Password;
-                            expSettings.Subcode = partnerExpSettings.Subcode;
+                            expSettings.ClientID = partnerFirstServiceSettings.ClientID;
+                            expSettings.ClientSecret = partnerFirstServiceSettings.ClientSecret;
+                            expSettings.Username = partnerFirstServiceSettings.Username;
+                            expSettings.Password = partnerFirstServiceSettings.Password;
+                            expSettings.Subcode = partnerFirstServiceSettings.Subcode;
                         }
                     }
 
                     jobCredentials = expSettings;
                     break;
-                case EJob.WorldCompliance:
+                case EJob.SecondJob:
 
-                    var lexisNexisSettings = _lexisNexisSettings;
+                    var secondServiceSettings = _secondServiceSettings;
 
                     if (!string.IsNullOrEmpty(partnerJobCredentials))
                     {
-                        var partnerNexisSettings = partnerJobCredentials.TryDeserializeObject<LexisNexisSettings>();
+                        var partnerSecondServiceSettings = partnerJobCredentials.TryDeserializeObject<SecondServiceSettings>();
 
-                        if (partnerNexisSettings is not null)
+                        if (partnerSecondServiceSettings is not null)
                         {
-                            lexisNexisSettings.ClientId = partnerNexisSettings.ClientId;
-                            lexisNexisSettings.UserId = partnerNexisSettings.UserId;
-                            lexisNexisSettings.Password = partnerNexisSettings.Password;
+                            secondServiceSettings.ClientId = partnerSecondServiceSettings.ClientId;
+                            secondServiceSettings.UserId = partnerSecondServiceSettings.UserId;
+                            secondServiceSettings.Password = partnerSecondServiceSettings.Password;
                         }
                     }
 
-                    jobCredentials = lexisNexisSettings;
+                    jobCredentials = secondServiceSettings;
                     break;
-                case EJob.ValidiFi:
+                case EJob.ThirdJob:
 
-                    var validifySettings = _validiFiSettings;
+                    var validifySettings = _thirdServiceSettings;
 
                     if (!string.IsNullOrEmpty(partnerJobCredentials))
                     {
-                        var partnerValidifySettings = partnerJobCredentials.TryDeserializeObject<ValidiFiSettings>();
+                        var partnerThirdServiceSettings = partnerJobCredentials.TryDeserializeObject<ThirdServiceSettings>();
 
-                        if (partnerValidifySettings is not null)
+                        if (partnerThirdServiceSettings is not null)
                         {
-                            validifySettings.ApiKey = partnerValidifySettings.ApiKey;
-                            validifySettings.ApiPassword = partnerValidifySettings.ApiPassword;
+                            validifySettings.ApiKey = partnerThirdServiceSettings.ApiKey;
+                            validifySettings.ApiPassword = partnerThirdServiceSettings.ApiPassword;
                         }
                     }
 
