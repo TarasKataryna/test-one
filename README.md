@@ -481,14 +481,7 @@ public class JobCredentialsManager : IJobCredentialsManager
 # User's permissions validation 
 **Description**
 <br>All user's data with permissions are stored in the Single Sign-On web applicaiton. This example contains the functionallity that validate user's permission in internall web application calling the SSO application. 
-```
-PermissionRequiredFilter
-```
-filter contains requests logic to SSO and pass there required permissions taken from the 
-```
-PermissionAuthorizeAttribute
-```
-attribute. 
+* * PermissionRequiredFilter * * filter contains requests logic to SSO and pass there required permissions taken from the * * PermissionAuthorizeAttribute * * attribute. 
 
 ```
  public class PermissionRequiredFilter : IAsyncAuthorizationFilter
