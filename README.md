@@ -477,3 +477,72 @@ public class JobCredentialsManager : IJobCredentialsManager
         }
     }
 ```
+
+# User permissions check
+```
+ public class PermissionRequiredFilter : IAsyncAuthorizationFilter
+ {
+     private const string AuthorizationHeader = "Authorization";
+     private const string BearerPrefix = "Bearer ";
+     private const string TokenExpired = "Token Expired";
+
+     private readonly IIdentityService _identityService;
+
+     public PermissionRequiredFilter(IIdentityService identityService)
+     {
+         _identityService = identityService;
+     }
+
+     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
+     {
+         if (context.ActionDescriptor is ControllerActionDescriptor controllerActionDescriptor)
+         {
+             if (controllerActionDescriptor.MethodInfo.GetCustomAttribute(typeof(PermissionAuthorizeAttribute)) is PermissionAuthorizeAttribute methodPermissionAttributeData)
+             {
+                 if (string.IsNullOrEmpty(methodPermissionAttributeData.Permission))
+                 {
+                     context.Result = new ForbidResult();
+                 }
+                 else
+                 {
+                     await PermissionCheckingProcess(context, methodPermissionAttributeData.Permission);
+                 }
+             }
+         }
+     }
+
+     private async Task PermissionCheckingProcess(AuthorizationFilterContext context, string permission)
+     {
+         //Here we expect to receive 200 status code (user has the permission) in order not to block incoming request and process this request
+         var permissionCheckStatus = await _identityService.CheckUserPermission(permission);
+
+         switch (permissionCheckStatus)
+         {
+             case HttpStatusCode.Unauthorized:
+                 context.Result = new UnauthorizedObjectResult(TokenExpired);
+                 break;
+             case HttpStatusCode.NotFound:
+                 context.Result = new ForbidResult();
+                 break;
+         }
+     }
+ }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public class PermissionAuthorizeAttribute : AuthorizeAttribute, IFilterFactory
+    {
+        public string Permission { get; set; }
+
+        public bool IsReusable => true;
+
+        public PermissionAuthorizeAttribute(string permission)
+        {
+            Permission = permission;
+        }
+
+        public IFilterMetadata CreateInstance(IServiceProvider serviceProvider)
+        {
+            return (IFilterMetadata) serviceProvider.GetService(typeof(PermissionRequiredFilter));
+        }
+    }
+```
