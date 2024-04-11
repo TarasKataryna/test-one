@@ -87,7 +87,7 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
 ```
 
 
-```
+```csharp
 public async Task<byte[]> ConvertTransactionToTransactionalData(
     IEnumerable<RemittanceTransactionFunding> transactions, 
     IEnumerable<Merchant> merchants, 
@@ -161,7 +161,7 @@ public async Task<byte[]> ConvertTransactionToTransactionalData(
 # Custom Json Converter
 **Description**
 <br> The main purpose of this implementation was to extend the logic of resolving the necessary implementations of background jobs, which mainly contain logic for third-party services integrations. To the existing logic, which included dependency injection of these background jobs and their resolving with ready-made services and configurations, it was necessary to add the ability to resolve these jobs with configurations that are contained in another project depending on the partner that invokes this logic. In this code snippet, two classes are provided, *JobHandlerFactory* for resolving these jobs with a dependency injection container and modifying the services and configurations they need to continue working. This class calls a conditional creds manager - *JobCredentialsManager*, which makes requests to another service, retrieves configurations, caches them if necessary, and returns them. As a result, we can use jobs with configurations specified in the appsettings.json file, as well as configurations that need to be obtained during program execution
-```
+```csharp
 public class JobHandlerFactory: IJobHandlerFactory
 {
     private readonly IJobCredentialsManager _jobCredentialsManager;
@@ -280,7 +280,7 @@ public class JobHandlerFactory: IJobHandlerFactory
 }
 ```
 
-```
+```csharp
 public class JobCredentialsManager : IJobCredentialsManager
 {
     private const string JobCredsPrefix = "_JobCreds";
@@ -435,7 +435,7 @@ public class JobCredentialsManager : IJobCredentialsManager
 **Description**
 <br> *IndividualInfoIntegrationDto* class has complex structure and is needed to be converted from json differently. *BusinessOwnerConverter* inherits from JsonConverter class and implements it's own logic for *IndividualInfoIntegrationDto* objects converting. 
 
-```
+```csharp
     public class BusinessOwnerConverter : JsonConverter
     {
         private const int IndividualCollectionsMaxCount = 4;
@@ -492,7 +492,7 @@ public class JobCredentialsManager : IJobCredentialsManager
 <br>All user's data with permissions are stored in the Single Sign-On web applicaiton. This example contains the functionallity that validate user's permission in internall web application calling the SSO application.
 *PermissionRequiredFilter* filter contains requests logic to SSO and pass there required permissions taken from the *PermissionAuthorizeAttribute* attribute. 
 
-```
+```csharp
  public class PermissionRequiredFilter : IAsyncAuthorizationFilter
  {
      private const string AuthorizationHeader = "Authorization";
