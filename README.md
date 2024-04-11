@@ -12,7 +12,7 @@ public async Task SendTransactionalDataToBank(DateTime dateToProcess, Solution s
     }
     
     var solutionName = Enum.GetName(typeof(Solution), solution);
-    var programId = solution == Solution.MoneyFirstServiceress
+    var programId = solution == Solution.FirstSolution
         ? _internalSettings.BankSettings.FirstSolutionProgramId
         : _internalSettings.BankSettings.SecondSolutionProgramId;
 
